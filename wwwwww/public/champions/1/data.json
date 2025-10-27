@@ -1,0 +1,16 @@
+{
+  "name": "Thunder Storm",
+  "ringNumber": "DV-02906-11-98",
+  "bloodline": "Janssen",
+  "gender": "MALE",
+  "birthDate": "2011-01-15T00:00:00.000Z",
+  "color": "Blue",
+  "weight": 480,
+  "breeder": "MTM Pałka",
+  "description": "Wybitny champion, mistrz olimpijski z doskonałymi wynikami w lotach długodystansowych.",
+  "achievements": [
+    "Mistrz Olimpijski 2011",
+    "1. miejsce - Barcelona 2011",
+    "2. miejsce - Tarnów 2010"
+  ]
+}

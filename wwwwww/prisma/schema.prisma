@@ -1,0 +1,421 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id            String    @id @default(cuid())
+  firebaseUid   String?   @unique // Add this field to store Firebase UID
+  firstName     String?
+  lastName      String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(USER)
+  isActive      Boolean   @default(false)
+  activationToken String?
+
+  // Address information
+  address       String?
+  city          String?
+  postalCode    String?
+  phoneNumber   String?
+
+  // Phone verification
+  isPhoneVerified Boolean @default(false)
+  phoneVerificationCode String?
+  phoneVerificationExpires DateTime?
+
+  // Profile verification
+  isProfileVerified Boolean @default(false)
+
+  // Two-Factor Authentication
+  twoFactorSecret String?
+  backupCodes String? // JSON array of backup codes
+  is2FAEnabled Boolean @default(false)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  // User specific data
+  auctions           Auction[]
+  bids               Bid[]
+  watchlist          WatchlistItem[]
+  messages           Message[]
+  buyerTransactions  Transaction[] @relation("BuyerTransactions")
+  sellerTransactions Transaction[] @relation("SellerTransactions")
+  breederMeetings    BreederMeeting[]
+
+  // Reviews system
+  givenReviews       Review[]      @relation("ReviewReviewer")
+  receivedReviews    Review[]      @relation("ReviewReviewee")
+  userRating         UserRating?
+
+  // Push notifications
+  pushSubscriptions  PushSubscription[]
+  notifications      Notification[]
+
+  // Messaging system
+  conversationsAsParticipant1 Conversation[] @relation("ConversationParticipant1")
+  conversationsAsParticipant2 Conversation[] @relation("ConversationParticipant2")
+  sentMessages       UserMessage[] @relation("UserMessageSender")
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+  @@index([isPhoneVerified])
+  @@index([isProfileVerified])
+  @@index([createdAt])
+}
+
+model BreederMeeting {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  location    String
+  date        DateTime
+  images      String   // JSON array of image URLs
+  isApproved  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([isApproved])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Pigeon {
+  id          String   @id @default(cuid())
+  name        String
+  ringNumber  String   @unique
+  bloodline   String
+  gender      String
+  birthDate   DateTime
+  color       String
+  weight      Float
+  breeder     String
+  description String?
+  images      String   // JSON array of image URLs
+  videos      String   // JSON array of video URLs
+  pedigree    String?  // JSON string of pedigree data
+  achievements String? // JSON array of achievements
+  isChampion  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  auctions Auction[]
+}
+
+enum AuctionStatus {
+  ACTIVE
+  ENDED
+  CANCELLED
+  PENDING
+}
+
+model Auction {
+  id          String      @id @default(cuid())
+  title       String
+  description String
+  category    String
+  pigeonId    String?
+  pigeon      Pigeon?     @relation(fields: [pigeonId], references: [id])
+  sellerId    String
+  seller      User        @relation(fields: [sellerId], references: [id])
+  
+  // Auction details
+  startingPrice Float
+  currentPrice  Float
+  buyNowPrice   Float?
+  reservePrice  Float?
+  
+  // Timing
+  startTime     DateTime
+  endTime       DateTime
+  status        AuctionStatus @default(ACTIVE)
+  isApproved    Boolean       @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relacja do zasobów
+  assets       AuctionAsset[]
+
+  bids         Bid[]
+  watchlist    WatchlistItem[]
+  messages     Message[]
+  transactions Transaction[]
+
+  @@index([isApproved])
+  @@index([status])
+  @@index([category])
+  @@index([sellerId])
+  @@index([startTime])
+  @@index([endTime])
+  @@index([currentPrice])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([status, isApproved])
+  @@index([category, status])
+  @@index([endTime, status])
+}
+
+enum AssetType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+model AuctionAsset {
+  id        String    @id @default(cuid())
+  auctionId String
+  auction   Auction   @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  type      AssetType
+  url       String
+  createdAt DateTime  @default(now())
+}
+
+model Bid {
+  id        String   @id @default(cuid())
+  auctionId String
+  auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  bidderId  String
+  bidder    User     @relation(fields: [bidderId], references: [id])
+  amount    Float
+  isWinning Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([auctionId])
+  @@index([bidderId])
+  @@index([amount])
+  @@index([createdAt])
+  @@index([auctionId, amount])
+  @@index([bidderId, createdAt])
+}
+
+model WatchlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auctionId String
+  auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, auctionId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  auctionId String
+  auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([auctionId])
+  @@index([senderId])
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  participant1Id String
+  participant1 User   @relation("ConversationParticipant1", fields: [participant1Id], references: [id], onDelete: Cascade)
+  participant2Id String
+  participant2 User   @relation("ConversationParticipant2", fields: [participant2Id], references: [id], onDelete: Cascade)
+  lastMessageAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages UserMessage[]
+
+  @@unique([participant1Id, participant2Id])
+  @@index([participant1Id])
+  @@index([participant2Id])
+}
+
+model UserMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User     @relation("UserMessageSender", fields: [senderId], references: [id])
+  content        String
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+model Transaction {
+  id          String            @id @default(cuid())
+  auctionId   String
+  auction     Auction           @relation(fields: [auctionId], references: [id])
+  buyerId     String
+  buyer       User              @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  sellerId    String
+  seller      User              @relation("SellerTransactions", fields: [sellerId], references: [id])
+  amount      Float
+  commission  Float
+  status      String            @default("PENDING")
+  paymentId   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Reviews
+  reviews     Review[]
+
+  @@index([auctionId])
+  @@index([buyerId])
+  @@index([sellerId])
+}
+
+model Reference {
+  id          String   @id @default(cuid())
+  breederName String
+  location    String
+  experience  String
+  testimonial String
+  rating      Int      @default(5)
+  achievements String  // JSON array of achievements
+  isApproved  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isApproved])
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  reviewerId  String
+  reviewer    User     @relation("ReviewReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  revieweeId  String
+  reviewee    User     @relation("ReviewReviewee", fields: [revieweeId], references: [id], onDelete: Cascade)
+  transactionId String
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  rating      Int      // 1-5 stars
+  title       String?
+  comment     String?
+  isAnonymous Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([reviewerId, transactionId])
+  @@index([revieweeId])
+  @@index([rating])
+  @@index([createdAt])
+}
+
+model UserRating {
+  id        String @id @default(cuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  averageRating Float @default(0)
+  totalReviews  Int   @default(0)
+  ratingBreakdown String // JSON: {1: count, 2: count, 3: count, 4: count, 5: count}
+
+  updatedAt DateTime @updatedAt
+}
+
+model PushSubscription {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+
+  userAgent   String?
+  ipAddress   String?
+
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastUsedAt  DateTime?
+
+  @@index([userId])
+  @@index([isActive])
+  @@index([lastUsedAt])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        String   // 'bid', 'auction_end', 'message', 'system'
+  title       String
+  message     String
+  data        String?  // JSON additional data
+
+  isRead      Boolean  @default(false)
+  isSent      Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  sentAt      DateTime?
+  readAt      DateTime?
+
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
+  @@index([isSent])
+  @@index([createdAt])
+}

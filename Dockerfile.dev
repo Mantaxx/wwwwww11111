@@ -1,0 +1,27 @@
+# Development Dockerfile for Next.js application
+FROM node:18-alpine
+
+# Install dependencies only when needed
+RUN apk add --no-cache libc6-compat
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install dependencies (ignore platform restrictions for Docker)
+RUN npm ci --legacy-peer-deps --force
+
+# Copy the rest of the application
+COPY . .
+
+# Expose port
+EXPOSE 3000
+
+# Set environment variables
+ENV NODE_ENV development
+ENV NEXT_TELEMETRY_DISABLED 1
+
+# Start development server
+CMD ["npm", "run", "dev"]

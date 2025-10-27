@@ -1,0 +1,106 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection - users can only access their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && 
+        resource.data.role == 'ADMIN' && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+    
+    // Auctions collection - authenticated users can read, verified users can write
+    match /auctions/{auctionId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isPhoneVerified == true;
+      allow delete: if request.auth != null && 
+        resource.data.sellerId == request.auth.uid;
+    }
+    
+    // Bids collection - authenticated users can read, verified users can write
+    match /bids/{bidId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isPhoneVerified == true;
+      allow delete: if request.auth != null && 
+        resource.data.bidderId == request.auth.uid;
+    }
+    
+    // Messages collection - authenticated users can read/write their own messages
+    match /messages/{messageId} {
+      allow read, write: if request.auth != null && 
+        resource.data.senderId == request.auth.uid;
+      allow read: if request.auth != null && 
+        resource.data.auctionId != null;
+    }
+    
+    // Conversations collection - participants can access their conversations
+    match /conversations/{conversationId} {
+      allow read, write: if request.auth != null && 
+        (resource.data.participant1Id == request.auth.uid || 
+         resource.data.participant2Id == request.auth.uid);
+    }
+    
+    // User messages within conversations
+    match /conversations/{conversationId}/messages/{messageId} {
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/conversations/$(conversationId)).data.participant1Id == request.auth.uid ||
+        get(/databases/$(database)/documents/conversations/$(conversationId)).data.participant2Id == request.auth.uid;
+    }
+    
+    // Admin-only collections
+    match /admin/{document=**} {
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+    
+    // Breeder meetings - authenticated users can read, verified users can write
+    match /breederMeetings/{meetingId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isPhoneVerified == true;
+      allow delete: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // References - authenticated users can read, admin can write
+    match /references/{referenceId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+    
+    // Transactions - participants can access their transactions
+    match /transactions/{transactionId} {
+      allow read, write: if request.auth != null && 
+        (resource.data.buyerId == request.auth.uid || 
+         resource.data.sellerId == request.auth.uid);
+    }
+    
+    // Reviews - authenticated users can read, transaction participants can write
+    match /reviews/{reviewId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        resource.data.reviewerId == request.auth.uid;
+    }
+    
+    // Notifications - users can only access their own notifications
+    match /notifications/{notificationId} {
+      allow read, write: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Push subscriptions - users can only access their own subscriptions
+    match /pushSubscriptions/{subscriptionId} {
+      allow read, write: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Default deny rule for any other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

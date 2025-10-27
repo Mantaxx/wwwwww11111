@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (Development)
+  postgres:
+    image: postgres:15-alpine
+    container_name: pigeon-auction-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pigeon_auction_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - pigeon-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching and sessions (Development)
+  redis:
+    image: redis:7-alpine
+    container_name: pigeon-auction-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass redis123
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - pigeon-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Next.js Application (Development)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: pigeon-auction-app-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./wwwwww:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      # Database
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/pigeon_auction_dev
+
+      # Redis
+      REDIS_URL: redis://:redis123@redis:6379
+
+      # Next.js
+      NODE_ENV: development
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+      # Authentication (use default for development)
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: development-secret-key-change-in-production
+
+      # Disable telemetry in development
+      NEXT_TELEMETRY_DISABLED: 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pigeon-network
+    command: npm run dev
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+
+networks:
+  pigeon-network:
+    driver: bridge
