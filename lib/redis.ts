@@ -13,5 +13,7 @@ if (!redis.isOpen) redis.connect();
  */
 export async function getJson<T>(key: string): Promise<T | null> {
   const val = await redis.get(key);
-  return val ? (JSON.parse(val) as T) : null;
+  if (!val) return null;
+  const stringVal = typeof val === 'string' ? val : val.toString();
+  return JSON.parse(stringVal) as T;
 }
